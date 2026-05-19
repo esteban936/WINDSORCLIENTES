@@ -10,7 +10,13 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(!demoMode);
   const [personaActiva, setPersonaActivaState] = useState(() => {
     const saved = localStorage.getItem('windsor_persona');
-    return saved ? JSON.parse(saved) : (demoMode ? demoPersona : null);
+    if (!saved) return demoMode ? demoPersona : null;
+    const parsed = JSON.parse(saved);
+    if (!demoMode && parsed?.id?.startsWith('00000000-0000-0000-0000-')) {
+      localStorage.removeItem('windsor_persona');
+      return null;
+    }
+    return parsed;
   });
 
   useEffect(() => {
