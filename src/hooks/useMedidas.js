@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { demoMedidas } from '../lib/demoData';
+import { getDemoMedidas, saveDemoMedidas } from '../lib/demoStore';
 import { demoMode, supabase } from '../lib/supabase';
 
 export function useMedidas(clienteId) {
@@ -10,7 +10,7 @@ export function useMedidas(clienteId) {
     if (!clienteId) return;
     setLoading(true);
     if (demoMode) {
-      setMedidas(demoMedidas.filter((item) => item.cliente_id === clienteId));
+      setMedidas(getDemoMedidas(clienteId));
       setLoading(false);
       return;
     }
@@ -31,7 +31,7 @@ export function useMedidas(clienteId) {
 }
 
 export async function createMedidas(payload) {
-  if (demoMode) return;
+  if (demoMode) return saveDemoMedidas(payload);
   const { error } = await supabase.from('medidas').insert(payload);
   if (error) throw error;
 }

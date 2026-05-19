@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { demoInteracciones } from '../lib/demoData';
+import { getDemoInteracciones, saveDemoInteraccion } from '../lib/demoStore';
 import { demoMode, supabase } from '../lib/supabase';
 
 export function useInteracciones(clienteId) {
@@ -10,7 +10,7 @@ export function useInteracciones(clienteId) {
     if (!clienteId) return;
     setLoading(true);
     if (demoMode) {
-      setInteracciones(demoInteracciones.filter((item) => item.cliente_id === clienteId));
+      setInteracciones(getDemoInteracciones(clienteId));
       setLoading(false);
       return;
     }
@@ -31,7 +31,7 @@ export function useInteracciones(clienteId) {
 }
 
 export async function createInteraccion(payload) {
-  if (demoMode) return;
+  if (demoMode) return saveDemoInteraccion(payload);
   const { error } = await supabase.from('interacciones').insert(payload);
   if (error) throw error;
 }

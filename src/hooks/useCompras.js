@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { demoCompras } from '../lib/demoData';
+import { getDemoCompras, saveDemoCompra, updateDemoCompraEstado } from '../lib/demoStore';
 import { demoMode, supabase } from '../lib/supabase';
 
 export function useCompras(clienteId) {
@@ -10,7 +10,7 @@ export function useCompras(clienteId) {
     if (!clienteId) return;
     setLoading(true);
     if (demoMode) {
-      setCompras(demoCompras.filter((item) => item.cliente_id === clienteId));
+      setCompras(getDemoCompras(clienteId));
       setLoading(false);
       return;
     }
@@ -31,14 +31,14 @@ export function useCompras(clienteId) {
 }
 
 export async function createCompra(payload) {
-  if (demoMode) return { id: `demo-compra-${Date.now()}`, ...payload };
+  if (demoMode) return saveDemoCompra(payload);
   const { data, error } = await supabase.from('compras').insert(payload).select().single();
   if (error) throw error;
   return data;
 }
 
 export async function updateCompraEstado(id, estado) {
-  if (demoMode) return;
+  if (demoMode) return updateDemoCompraEstado(id, estado);
   const { error } = await supabase.from('compras').update({ estado }).eq('id', id);
   if (error) throw error;
 }

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { demoCompras } from '../lib/demoData';
-import { getDemoClientes } from '../lib/demoStore';
+import { getDemoClientes, getDemoCompras } from '../lib/demoStore';
 import { demoMode, supabase } from '../lib/supabase';
 import { today } from '../lib/formatters';
 
@@ -19,6 +18,7 @@ export function useDashboardData() {
     setLoading(true);
     if (demoMode) {
       const demoClientes = getDemoClientes();
+      const demoCompras = getDemoCompras();
       setData({
         clientesHoy: 1,
         fichasHoy: 1,
