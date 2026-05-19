@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { demoClientes } from '../lib/demoData';
+import { getDemoCliente, getDemoClientes, saveDemoCliente } from '../lib/demoStore';
 import { demoMode, supabase } from '../lib/supabase';
 
 export function useClientes(search = '') {
@@ -10,7 +10,7 @@ export function useClientes(search = '') {
     setLoading(true);
     if (demoMode) {
       const term = search.toLowerCase().trim();
-      setClientes(demoClientes.filter((cliente) =>
+      setClientes(getDemoClientes().filter((cliente) =>
         !term || [cliente.nombre, cliente.celular, cliente.email].some((value) => value?.toLowerCase().includes(term))
       ));
       setLoading(false);
@@ -40,7 +40,7 @@ export function useClientes(search = '') {
 
 export async function getCliente(id) {
   if (demoMode) {
-    const cliente = demoClientes.find((item) => item.id === id);
+    const cliente = getDemoCliente(id);
     if (!cliente) throw new Error('Cliente no encontrado en demo.');
     return cliente;
   }
@@ -51,7 +51,7 @@ export async function getCliente(id) {
 
 export async function saveCliente(payload, id) {
   if (demoMode) {
-    return { id: id ?? `demo-cliente-${Date.now()}`, ...payload, created_at: new Date().toISOString() };
+    return saveDemoCliente(payload, id);
   }
   const query = id ? supabase.from('clientes').update(payload).eq('id', id).select().single() : supabase.from('clientes').insert(payload).select().single();
   const { data, error } = await query;
