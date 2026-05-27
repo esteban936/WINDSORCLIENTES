@@ -57,6 +57,7 @@ BEGIN
     EXECUTE format('DROP POLICY IF EXISTS "%s_authenticated_insert" ON %I', tabla, tabla);
     EXECUTE format('DROP POLICY IF EXISTS "%s_authenticated_update" ON %I', tabla, tabla);
     EXECUTE format('DROP POLICY IF EXISTS "%s_admin_delete" ON %I', tabla, tabla);
+    EXECUTE format('DROP POLICY IF EXISTS "%s_anon_login_select" ON %I', tabla, tabla);
 
     EXECUTE format(
       'CREATE POLICY "%s_authenticated_select" ON %I FOR SELECT TO authenticated USING (true)',
@@ -80,3 +81,9 @@ BEGIN
     );
   END LOOP;
 END $$;
+
+CREATE POLICY "equipo_anon_login_select"
+ON equipo
+FOR SELECT
+TO anon
+USING (auth_id IS NOT NULL AND activo = true);
