@@ -8,15 +8,11 @@ import { ListaClientes } from './pages/ListaClientes';
 import { Login } from './pages/Login';
 import { NuevaCompra } from './pages/NuevaCompra';
 import { NuevaFicha } from './pages/NuevaFicha';
-import { SeleccionPersona } from './pages/SeleccionPersona';
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route element={<ProtectedRoute requirePerson={false} />}>
-        <Route path="/seleccion-persona" element={<SeleccionPersona />} />
-      </Route>
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route index element={<Dashboard />} />
@@ -25,10 +21,10 @@ export default function App() {
           <Route path="/clientes/:id" element={<FichaCliente />} />
           <Route path="/compras/nueva" element={<NuevaCompra />} />
           <Route path="/configuracion" element={<Configuracion />} />
+          <Route path="/seleccion-persona" element={<Navigate to="/" replace />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
-

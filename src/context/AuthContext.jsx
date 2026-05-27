@@ -3,21 +3,14 @@ import { demoMode, supabase, supabaseConfigured } from '../lib/supabase';
 
 const AuthContext = createContext(null);
 const demoSession = { user: { email: 'demo@windsor.local' } };
-const demoPersona = { id: '00000000-0000-0000-0000-000000000001', nombre: 'Pablo' };
+const demoUsuario = { id: '00000000-0000-0000-0000-000000000001', nombre: 'Pablo', rol: 'admin' };
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(demoMode ? demoSession : null);
   const [loading, setLoading] = useState(!demoMode);
-  const [personaActiva, setPersonaActivaState] = useState(() => {
-    const saved = localStorage.getItem('windsor_persona');
-    if (!saved) return demoMode ? demoPersona : null;
-    const parsed = JSON.parse(saved);
-    if (!demoMode && parsed?.id?.startsWith('00000000-0000-0000-0000-')) {
-      localStorage.removeItem('windsor_persona');
-      return null;
-    }
-    return parsed;
-  });
+  const [usuario, setUsuario] = useState(demoMode ? demoUsuario : null);
+  const [rol, setRol] = useState(demoMode ? 'admin' : null);
+  const [authError, setAuthError] = useState('');
 
   useEffect(() => {
     if (demoMode) {
@@ -26,37 +19,75 @@ export function AuthProvider({ children }) {
     }
 
     supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
+      loadSession(data.session);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      if (!nextSession) setPersonaActiva(null);
+      loadSession(nextSession);
     });
 
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  const setPersonaActiva = (persona) => {
-    setPersonaActivaState(persona);
-    if (persona) localStorage.setItem('windsor_persona', JSON.stringify(persona));
-    else localStorage.removeItem('windsor_persona');
+  const loadSession = async (nextSession) => {
+    setLoading(true);
+    setSession(nextSession);
+    setAuthError('');
+
+    if (!nextSession) {
+      setUsuario(null);
+      setRol(null);
+      localStorage.removeItem('windsor_persona');
+      setLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('equipo')
+      .select('id, nombre, activo, rol, auth_id')
+      .eq('auth_id', nextSession.user.id)
+      .eq('activo', true)
+      .maybeSingle();
+
+    if (error) {
+      setUsuario(null);
+      setRol(null);
+      setAuthError(error.message);
+      setLoading(false);
+      return;
+    }
+
+    if (!data) {
+      setUsuario(null);
+      setRol(null);
+      setAuthError('Tu usuario no está vinculado al equipo. Revisá auth_id en Supabase.');
+      setLoading(false);
+      return;
+    }
+
+    setUsuario(data);
+    setRol(data.rol ?? 'vendedor');
+    localStorage.setItem('windsor_persona', JSON.stringify(data));
+    setLoading(false);
   };
 
   const signIn = async (email, password) => {
     if (demoMode) {
       setSession(demoSession);
-      if (!personaActiva) setPersonaActiva(demoPersona);
+      setUsuario(demoUsuario);
+      setRol(demoUsuario.rol);
       return;
     }
     if (!supabaseConfigured) throw new Error('Faltan VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en el entorno.');
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    await loadSession(data.session);
   };
 
-  const signOut = async () => {
-    setPersonaActiva(null);
+  const logout = async () => {
+    setUsuario(null);
+    setRol(null);
+    localStorage.removeItem('windsor_persona');
     if (demoMode) {
       setSession(null);
       return;
@@ -64,9 +95,23 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut();
   };
 
+  const isAdmin = () => rol === 'admin';
+
   const value = useMemo(
-    () => ({ session, loading, personaActiva, setPersonaActiva, signIn, signOut, demoMode }),
-    [session, loading, personaActiva],
+    () => ({
+      session,
+      usuario,
+      personaActiva: usuario,
+      rol,
+      loading,
+      authError,
+      signIn,
+      logout,
+      signOut: logout,
+      isAdmin,
+      demoMode,
+    }),
+    [session, usuario, rol, loading, authError],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

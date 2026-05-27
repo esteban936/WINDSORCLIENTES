@@ -1,4 +1,4 @@
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { LogOut, Settings, UserRound } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/Button';
@@ -11,8 +11,8 @@ const nav = [
 ];
 
 export function AppLayout() {
-  const { personaActiva, signOut } = useAuth();
-  const navigate = useNavigate();
+  const { usuario, rol, logout } = useAuth();
+  const rolLabel = rol === 'admin' ? 'Admin' : 'Vendedor';
 
   return (
     <div className="min-h-screen bg-neutral-100">
@@ -22,11 +22,11 @@ export function AppLayout() {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 rounded-md border border-white/15 px-3 py-2 text-sm">
               <UserRound size={16} className="text-champagne" />
-              Atiende {personaActiva?.nombre}
+              {usuario?.nombre}
+              <span className="rounded bg-champagne px-2 py-0.5 text-xs font-bold text-ink">{rolLabel}</span>
             </div>
-            <Button variant="gold" onClick={() => navigate('/seleccion-persona')}>Cambiar persona</Button>
-            <Button variant="ghost" className="text-white hover:bg-white/10" onClick={signOut}>
-              <LogOut size={16} /> Salir
+            <Button variant="ghost" className="text-white hover:bg-white/10" onClick={logout}>
+              <LogOut size={16} /> Cerrar sesión
             </Button>
           </div>
         </div>
@@ -57,4 +57,3 @@ export function AppLayout() {
     </div>
   );
 }
-
