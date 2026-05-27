@@ -44,10 +44,9 @@ export function AuthProvider({ children }) {
 
     const { data, error } = await supabase
       .from('equipo')
-      .select('id, nombre, activo, rol, auth_id')
+      .select('id, nombre, rol')
       .eq('auth_id', nextSession.user.id)
-      .eq('activo', true)
-      .maybeSingle();
+      .single();
 
     if (error) {
       setUsuario(null);
@@ -65,9 +64,15 @@ export function AuthProvider({ children }) {
       return;
     }
 
-    setUsuario(data);
-    setRol(data.rol ?? 'vendedor');
-    localStorage.setItem('windsor_persona', JSON.stringify(data));
+    const usuarioLogueado = {
+      id: data.id,
+      nombre: data.nombre,
+      rol: data.rol ?? 'vendedor',
+    };
+
+    setUsuario(usuarioLogueado);
+    setRol(usuarioLogueado.rol);
+    localStorage.setItem('windsor_persona', JSON.stringify(usuarioLogueado));
     setLoading(false);
   };
 
