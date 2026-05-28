@@ -11,9 +11,9 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
-async function sendEmail(to: string, subject: string, html: string) {
+async function sendEmail(to: string[], subject: string, html: string) {
   const apiKey = Deno.env.get('RESEND_API_KEY');
-  const from = Deno.env.get('RESEND_FROM_EMAIL') ?? 'Windsor Sastrería <recordatorios@windsor.local>';
+  const from = Deno.env.get('RESEND_FROM_EMAIL') ?? 'Windsor Sastrería <onboarding@resend.dev>';
   if (!apiKey) return false;
 
   const response = await fetch('https://api.resend.com/emails', {
@@ -28,16 +28,6 @@ async function sendEmail(to: string, subject: string, html: string) {
   return response.ok;
 }
 
-async function getConfigNumber(clave: string, fallback: number) {
-  const { data } = await supabase.from('configuracion').select('valor').eq('clave', clave).maybeSingle();
-  const parsed = Number(data?.valor);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function dateOnly(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
-
 function argentinaToday() {
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Argentina/Buenos_Aires',
@@ -45,87 +35,65 @@ function argentinaToday() {
     month: '2-digit',
     day: '2-digit',
   });
-  return new Date(`${formatter.format(new Date())}T00:00:00-03:00`);
-}
-
-async function ensureReminder(clienteId: string, tipo: string, fechaEnvio: string, mensaje: string, estado = 'pendiente') {
-  const { data } = await supabase
-    .from('recordatorios')
-    .select('id')
-    .eq('cliente_id', clienteId)
-    .eq('tipo', tipo)
-    .eq('fecha_envio', fechaEnvio)
-    .maybeSingle();
-
-  if (!data) {
-    await supabase.from('recordatorios').insert({ cliente_id: clienteId, tipo, fecha_envio: fechaEnvio, mensaje, estado });
-  }
+  return new Date(formatter.format(new Date()) + 'T00:00:00-03:00');
 }
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const hoy = argentinaToday();
-  const diasCumpleanos = await getConfigNumber('dias_cumpleanos', 3);
-  const mesesReactivacion = await getConfigNumber('meses_reactivacion', 6);
+  const diasAnticipacion = 7;
 
   const { data: clientes = [] } = await supabase
     .from('clientes')
-    .select('id, nombre, email, fecha_nacimiento');
+    .select('id, nombre, fecha_nacimiento, celular');
+
+  const cumpleaneros = [];
 
   for (const cliente of clientes) {
     if (cliente.fecha_nacimiento) {
-      const nacimiento = new Date(`${cliente.fecha_nacimiento}T00:00:00`);
+      const nacimiento = new Date(cliente.fecha_nacimiento + 'T00:00:00');
       const cumple = new Date(hoy.getFullYear(), nacimiento.getMonth(), nacimiento.getDate());
       if (cumple < hoy) cumple.setFullYear(hoy.getFullYear() + 1);
       const diff = Math.ceil((cumple.getTime() - hoy.getTime()) / 86400000);
-      if (diff >= 0 && diff <= diasCumpleanos) {
-        let estado = 'pendiente';
-        if (cliente.email) {
-          const sent = await sendEmail(
-            cliente.email,
-            'Windsor Sastrería te saluda por tu cumpleaños',
-            `<p>Hola ${cliente.nombre},</p><p>Desde Windsor Sastrería queremos saludarte por tu cumpleaños.</p>`,
-          );
-          estado = sent ? 'enviado' : 'fallido';
-        }
-        await ensureReminder(cliente.id, 'cumpleanos', dateOnly(cumple), `Cumpleaños de ${cliente.nombre}`, estado);
+      if (diff >= 0 && diff <= diasAnticipacion) {
+        const dia = cumple.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+        cumpleaneros.push({
+          nombre: cliente.nombre,
+          fecha: dia,
+          celular: cliente.celular || 'Sin teléfono',
+        });
       }
     }
   }
 
-  const corteReactivacion = new Date(hoy);
-  corteReactivacion.setMonth(corteReactivacion.getMonth() - mesesReactivacion);
-  const { data: ultimas = [] } = await supabase
-    .from('clientes')
-    .select('id, nombre, interacciones(fecha)')
-    .order('fecha', { foreignTable: 'interacciones', ascending: false });
+  if (cumpleaneros.length > 0) {
+    const adminEmails = (Deno.env.get('ADMIN_EMAILS') ?? '').split(',').map(e => e.trim()).filter(Boolean);
+    
+    if (adminEmails.length > 0) {
+      const listaHTML = cumpleaneros
+        .map(c => `<tr><td style="padding:8px;border-bottom:1px solid #eee">${c.nombre}</td><td style="padding:8px;border-bottom:1px solid #eee">${c.fecha}</td><td style="padding:8px;border-bottom:1px solid #eee">${c.celular}</td></tr>`)
+        .join('');
 
-  for (const cliente of ultimas) {
-    const ultima = cliente.interacciones?.[0]?.fecha ? new Date(cliente.interacciones[0].fecha) : null;
-    if (!ultima || ultima < corteReactivacion) {
-      await ensureReminder(cliente.id, 'reactivacion', dateOnly(hoy), `Reactivar contacto con ${cliente.nombre}`);
+      const html = `
+        <h2>Cumpleaños próximos — Windsor Sastrería</h2>
+        <p>Los siguientes clientes cumplen años en los próximos 7 días:</p>
+        <table style="border-collapse:collapse;width:100%">
+          <tr style="background:#f5f5f5">
+            <th style="padding:8px;text-align:left">Cliente</th>
+            <th style="padding:8px;text-align:left">Fecha</th>
+            <th style="padding:8px;text-align:left">Teléfono</th>
+          </tr>
+          ${listaHTML}
+        </table>
+        <p style="margin-top:16px;color:#888">— Sistema Windsor</p>
+      `;
+
+      await sendEmail(adminEmails, '🎂 Cumpleaños próximos — Windsor Sastrería', html);
     }
   }
 
-  const hastaEvento = new Date(hoy);
-  hastaEvento.setDate(hastaEvento.getDate() + 14);
-  const { data: eventos = [] } = await supabase
-    .from('compras')
-    .select('cliente_id, evento, fecha_evento, clientes(nombre)')
-    .gte('fecha_evento', dateOnly(hoy))
-    .lte('fecha_evento', dateOnly(hastaEvento));
-
-  for (const compra of eventos) {
-    await ensureReminder(
-      compra.cliente_id,
-      'evento_proximo',
-      compra.fecha_evento,
-      `${compra.evento ?? 'Evento'} próximo de ${compra.clientes?.nombre ?? 'cliente'}`
-    );
-  }
-
-  return new Response(JSON.stringify({ ok: true }), {
+  return new Response(JSON.stringify({ ok: true, cumpleaneros: cumpleaneros.length }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 });
