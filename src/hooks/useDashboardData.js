@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getDemoClientes, getDemoCompras } from '../lib/demoStore';
-import { demoMode, supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { today } from '../lib/formatters';
 
 export function useDashboardData() {
@@ -16,20 +15,6 @@ export function useDashboardData() {
 
   const fetchData = async () => {
     setLoading(true);
-    if (demoMode) {
-      const demoClientes = getDemoClientes();
-      const demoCompras = getDemoCompras();
-      setData({
-        clientesHoy: 1,
-        fichasHoy: 1,
-        pendientes: demoCompras.filter((compra) => compra.estado === 'listo'),
-        cumpleanos: demoClientes.slice(0, 1),
-        sinContacto: demoClientes.slice(1, 2).map((cliente) => ({ ...cliente, ultima: cliente.interacciones?.[0]?.fecha })),
-        eventos: demoCompras.filter((compra) => compra.fecha_evento),
-      });
-      setLoading(false);
-      return;
-    }
     const hoy = today();
     const en7 = new Date();
     en7.setDate(en7.getDate() + 7);

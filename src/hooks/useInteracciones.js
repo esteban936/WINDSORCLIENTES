@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getDemoInteracciones, saveDemoInteraccion } from '../lib/demoStore';
-import { demoMode, supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 
 export function useInteracciones(clienteId) {
   const [interacciones, setInteracciones] = useState([]);
@@ -9,11 +8,6 @@ export function useInteracciones(clienteId) {
   const fetchInteracciones = async () => {
     if (!clienteId) return;
     setLoading(true);
-    if (demoMode) {
-      setInteracciones(getDemoInteracciones(clienteId));
-      setLoading(false);
-      return;
-    }
     const { data, error } = await supabase
       .from('interacciones')
       .select('*, equipo(nombre)')
@@ -31,7 +25,6 @@ export function useInteracciones(clienteId) {
 }
 
 export async function createInteraccion(payload) {
-  if (demoMode) return saveDemoInteraccion(payload);
   const { error } = await supabase.from('interacciones').insert(payload);
   if (error) throw error;
 }

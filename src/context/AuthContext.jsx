@@ -1,23 +1,16 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { demoMode, supabase, supabaseConfigured } from '../lib/supabase';
+import { supabase, supabaseConfigured } from '../lib/supabase';
 
 const AuthContext = createContext(null);
-const demoSession = { user: { email: 'demo@windsor.local' } };
-const demoUsuario = { id: '00000000-0000-0000-0000-000000000001', nombre: 'Pablo', rol: 'admin' };
 
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(demoMode ? demoSession : null);
-  const [loading, setLoading] = useState(!demoMode);
-  const [usuario, setUsuario] = useState(demoMode ? demoUsuario : null);
-  const [rol, setRol] = useState(demoMode ? 'admin' : null);
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [usuario, setUsuario] = useState(null);
+  const [rol, setRol] = useState(null);
   const [authError, setAuthError] = useState('');
 
   useEffect(() => {
-    if (demoMode) {
-      setLoading(false);
-      return undefined;
-    }
-
     cargarUsuarioDesdeSesionActual();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
@@ -109,12 +102,6 @@ export function AuthProvider({ children }) {
   };
 
   const signIn = async (email, password) => {
-    if (demoMode) {
-      setSession(demoSession);
-      setUsuario(demoUsuario);
-      setRol(demoUsuario.rol);
-      return;
-    }
     if (!supabaseConfigured) throw new Error('Faltan VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en el entorno.');
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
@@ -123,10 +110,6 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     clearUsuario();
-    if (demoMode) {
-      setSession(null);
-      return;
-    }
     await supabase.auth.signOut();
   };
 
@@ -144,7 +127,6 @@ export function AuthProvider({ children }) {
       logout,
       signOut: logout,
       isAdmin,
-      demoMode,
     }),
     [session, usuario, rol, loading, authError],
   );

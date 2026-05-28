@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { demoMode, supabase } from '../lib/supabase';
-import { demoEquipo } from '../lib/demoData';
+import { supabase } from '../lib/supabase';
 
 export function useEquipo(soloActivos = true) {
   const [equipo, setEquipo] = useState([]);
@@ -8,11 +7,6 @@ export function useEquipo(soloActivos = true) {
 
   const fetchEquipo = async () => {
     setLoading(true);
-    if (demoMode) {
-      setEquipo(soloActivos ? demoEquipo.filter((persona) => persona.activo) : demoEquipo);
-      setLoading(false);
-      return;
-    }
     let query = supabase.from('equipo').select('*').order('nombre');
     if (soloActivos) query = query.eq('activo', true);
     const { data, error } = await query;
