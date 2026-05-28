@@ -5,25 +5,6 @@ const AuthContext = createContext(null);
 const demoSession = { user: { email: 'demo@windsor.local' } };
 const demoUsuario = { id: '00000000-0000-0000-0000-000000000001', nombre: 'Pablo', rol: 'admin' };
 
-async function fetchUsuarioPorAuthId(authId) {
-  if (!authId) throw new Error('No se encontró el ID de autenticación del usuario.');
-
-  const { data, error } = await supabase
-    .from('equipo')
-    .select('id, nombre, rol')
-    .eq('auth_id', authId)
-    .single();
-
-  if (error) throw error;
-  if (!data) throw new Error('Tu usuario no está vinculado al equipo. Revisá auth_id en Supabase.');
-
-  return {
-    id: data.id,
-    nombre: data.nombre,
-    rol: data.rol ?? 'vendedor',
-  };
-}
-
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(demoMode ? demoSession : null);
   const [loading, setLoading] = useState(!demoMode);
@@ -37,12 +18,11 @@ export function AuthProvider({ children }) {
       return undefined;
     }
 
-    supabase.auth.getSession().then(({ data }) => {
-      loadSession(data.session);
-    });
+    cargarUsuarioDesdeSesionActual();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      loadSession(nextSession);
+      if (nextSession) cargarUsuarioDesdeSesionActual();
+      else loadSession(null);
     });
 
     return () => listener.subscription.unsubscribe();
@@ -72,9 +52,55 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const usuarioLogueado = await fetchUsuarioPorAuthId(nextSession.user.id);
+      const usuarioLogueado = await buscarMiembroPorAuthId(nextSession.user.id);
       applyUsuario(usuarioLogueado);
     } catch (error) {
+      clearUsuario();
+      setAuthError(error.message ?? 'No pudimos cargar el usuario autenticado.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const buscarMiembroPorAuthId = async (userId) => {
+    if (!userId) throw new Error('No se encontró el ID de autenticación del usuario.');
+
+    const { data: miembro, error } = await supabase
+      .from('equipo')
+      .select('id, nombre, rol')
+      .eq('auth_id', userId)
+      .single();
+
+    if (error) throw error;
+    if (!miembro) throw new Error('Tu usuario no está vinculado al equipo. Revisá auth_id en Supabase.');
+
+    return {
+      id: miembro.id,
+      nombre: miembro.nombre,
+      rol: miembro.rol ?? 'vendedor',
+    };
+  };
+
+  const cargarUsuarioDesdeSesionActual = async () => {
+    setLoading(true);
+    setAuthError('');
+
+    try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+      if (!currentSession) {
+        setSession(null);
+        clearUsuario();
+        return;
+      }
+
+      const userId = currentSession.user.id;
+      const usuarioLogueado = await buscarMiembroPorAuthId(userId);
+
+      setSession(currentSession);
+      applyUsuario(usuarioLogueado);
+    } catch (error) {
+      setSession(null);
       clearUsuario();
       setAuthError(error.message ?? 'No pudimos cargar el usuario autenticado.');
     } finally {
@@ -90,16 +116,9 @@ export function AuthProvider({ children }) {
       return;
     }
     if (!supabaseConfigured) throw new Error('Faltan VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en el entorno.');
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-
-    const nextSession = data.session;
-    const authId = nextSession?.user?.id;
-    const usuarioLogueado = await fetchUsuarioPorAuthId(authId);
-
-    setSession(nextSession);
-    setAuthError('');
-    applyUsuario(usuarioLogueado);
+    await cargarUsuarioDesdeSesionActual();
   };
 
   const logout = async () => {
