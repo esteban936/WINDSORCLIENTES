@@ -10,31 +10,45 @@ export function MedidasPanel({ clienteId }) {
   const { personaActiva } = useAuth();
   const [tipoPrenda, setTipoPrenda] = useState('traje');
   const [openId, setOpenId] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const { medidas, loading, refetch } = useMedidas(clienteId);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setSuccessMessage('');
+    setErrorMessage('');
+    const formElement = event.currentTarget;
     const form = new FormData(event.currentTarget);
     const datos = {};
     medidasPorPrenda[tipoPrenda].forEach((campo) => {
       const value = form.get(campo);
       if (value !== '') datos[campo] = Number(value);
     });
-    await createMedidas({
-      cliente_id: clienteId,
-      tipo_prenda: tipoPrenda,
-      tomadas_por: personaActiva?.id,
-      datos,
-      notas: form.get('notas') || null,
-    });
-    event.currentTarget.reset();
-    await refetch();
+
+    try {
+      await createMedidas({
+        cliente_id: clienteId,
+        tipo_prenda: tipoPrenda,
+        tomadas_por: personaActiva?.id,
+        datos,
+        notas: form.get('notas') || null,
+      });
+      formElement.reset();
+      setSuccessMessage('Medidas guardadas correctamente');
+      window.setTimeout(() => setSuccessMessage(''), 5000);
+      await refetch();
+    } catch (error) {
+      setErrorMessage(error.message ?? 'No se pudieron guardar las medidas.');
+    }
   };
 
   return (
     <div className="space-y-5">
       <Card title="Tomar medidas">
         <form onSubmit={handleSubmit} className="space-y-4">
+          {successMessage ? <p className="rounded-md bg-green-50 p-3 text-sm font-semibold text-green-700">{successMessage}</p> : null}
+          {errorMessage ? <p className="rounded-md bg-red-50 p-3 text-sm font-semibold text-red-700">{errorMessage}</p> : null}
           <label className="block max-w-xs">
             <span className="label">Tipo de prenda</span>
             <select className="field mt-1" value={tipoPrenda} onChange={(event) => setTipoPrenda(event.target.value)}>
@@ -92,4 +106,3 @@ export function MedidasPanel({ clienteId }) {
     </div>
   );
 }
-
