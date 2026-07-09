@@ -5,6 +5,25 @@ import { Card } from '../components/ui/Card';
 import { useClientes } from '../hooks/useClientes';
 import { formatDateTime } from '../lib/formatters';
 
+function descargarCSV(clientes) {
+  const filas = [
+    ['Nombre', 'Email', 'Celular', 'Fecha de alta'],
+    ...clientes.map((c) => [
+      c.nombre ?? '',
+      c.email ?? '',
+      c.celular ?? '',
+      c.created_at ? new Date(c.created_at).toLocaleDateString('es-AR') : '',
+    ]),
+  ];
+  const csv = filas.map((fila) => fila.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'clientes-windsor.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function ListaClientes() {
   const [search, setSearch] = useState('');
   const [estado, setEstado] = useState('');
@@ -26,7 +45,10 @@ export function ListaClientes() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="font-serif text-3xl font-bold">Clientes</h1>
-        <Link to="/clientes/nuevo" className="inline-flex rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white">Nueva ficha</Link>
+        <div className="flex items-center gap-3">
+          <Button variant="secondary" onClick={() => descargarCSV(filtered)}>Descargar CSV</Button>
+          <Link to="/clientes/nuevo" className="inline-flex rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white">Nueva ficha</Link>
+        </div>
       </div>
       <Card>
         <div className="grid grid-cols-[1fr_220px_220px] gap-4">

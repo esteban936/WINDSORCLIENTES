@@ -79,6 +79,12 @@ export function FichaCliente() {
 
       {activeTab === 'datos' && (
         <Card title="Datos personales">
+          <div className="mb-4 grid grid-cols-2 gap-4 border-b border-neutral-100 pb-4">
+            <div>
+              <span className="label">Fecha de alta</span>
+              <p className="mt-1 text-sm">{new Date(cliente.created_at).toLocaleDateString('es-AR')}</p>
+            </div>
+          </div>
           <ClienteForm value={cliente} onSubmit={saveDatos} />
         </Card>
       )}
