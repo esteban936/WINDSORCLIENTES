@@ -28,18 +28,62 @@ export function ListaClientes() {
   const [search, setSearch] = useState('');
   const [estado, setEstado] = useState('');
   const [meses, setMeses] = useState('');
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
+  const [orden, setOrden] = useState({ campo: 'nombre', dir: 'asc' });
   const { clientes, loading } = useClientes(search);
 
   const filtered = useMemo(() => {
     const corte = meses ? new Date() : null;
     if (corte) corte.setMonth(corte.getMonth() - Number(meses));
-    return clientes.filter((cliente) => {
+
+    const desdeTime = desde ? new Date(desde + 'T00:00:00').getTime() : null;
+    const hastaTime = hasta ? new Date(hasta + 'T23:59:59').getTime() : null;
+
+    const resultado = clientes.filter((cliente) => {
       const activa = (cliente.compras ?? []).some((compra) => compra.estado === estado);
       const ultima = (cliente.interacciones ?? []).map((item) => item.fecha).sort().at(-1);
       const sinContacto = corte ? !ultima || new Date(ultima) < corte : true;
-      return (!estado || activa) && sinContacto;
+
+      // Filtro por rango de fecha de alta (created_at)
+      const alta = cliente.created_at ? new Date(cliente.created_at).getTime() : null;
+      const dentroDesde = desdeTime ? alta !== null && alta >= desdeTime : true;
+      const dentroHasta = hastaTime ? alta !== null && alta <= hastaTime : true;
+
+      return (!estado || activa) && sinContacto && dentroDesde && dentroHasta;
     });
-  }, [clientes, estado, meses]);
+
+    // Ordenamiento
+    const orillados = [...resultado].sort((a, b) => {
+      if (orden.campo === 'created_at') {
+        const va = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const vb = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return orden.dir === 'asc' ? va - vb : vb - va;
+      }
+      // nombre
+      const na = (a.nombre ?? '').toLowerCase();
+      const nb = (b.nombre ?? '').toLowerCase();
+      const cmp = na.localeCompare(nb, 'es');
+      return orden.dir === 'asc' ? cmp : -cmp;
+    });
+
+    return orillados;
+  }, [clientes, estado, meses, desde, hasta, orden]);
+
+  const toggleOrden = (campo) => {
+    setOrden((prev) =>
+      prev.campo === campo
+        ? { campo, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+        : { campo, dir: 'asc' }
+    );
+  };
+
+  const flecha = (campo) => (orden.campo === campo ? (orden.dir === 'asc' ? ' ↑' : ' ↓') : '');
+
+  const limpiarRango = () => {
+    setDesde('');
+    setHasta('');
+  };
 
   return (
     <div className="space-y-5">
@@ -65,14 +109,37 @@ export function ListaClientes() {
             <option value="12">Sin contacto en 12 meses</option>
           </select>
         </div>
+        <div className="mt-4 flex flex-wrap items-end gap-4">
+          <div className="flex flex-col">
+            <label className="mb-1 text-xs uppercase text-neutral-500">Alta desde</label>
+            <input type="date" className="field" value={desde} onChange={(event) => setDesde(event.target.value)} />
+          </div>
+          <div className="flex flex-col">
+            <label className="mb-1 text-xs uppercase text-neutral-500">Alta hasta</label>
+            <input type="date" className="field" value={hasta} onChange={(event) => setHasta(event.target.value)} />
+          </div>
+          {(desde || hasta) ? (
+            <Button variant="secondary" onClick={limpiarRango}>Limpiar rango</Button>
+          ) : null}
+          <span className="ml-auto self-center text-sm text-neutral-500">{filtered.length} cliente(s)</span>
+        </div>
       </Card>
       <Card>
         <table className="w-full text-left text-sm">
           <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500">
             <tr>
-              <th className="py-3">Nombre</th>
+              <th className="py-3">
+                <button type="button" className="uppercase hover:text-ink" onClick={() => toggleOrden('nombre')}>
+                  Nombre{flecha('nombre')}
+                </button>
+              </th>
               <th>Celular</th>
               <th>Email</th>
+              <th>
+                <button type="button" className="uppercase hover:text-ink" onClick={() => toggleOrden('created_at')}>
+                  Alta{flecha('created_at')}
+                </button>
+              </th>
               <th>Última visita</th>
               <th>Compras activas</th>
             </tr>
@@ -86,6 +153,7 @@ export function ListaClientes() {
                   <td className="py-3 font-semibold"><Link to={`/clientes/${cliente.id}`}>{cliente.nombre}</Link></td>
                   <td>{cliente.celular ?? '-'}</td>
                   <td>{cliente.email ?? '-'}</td>
+                  <td>{cliente.created_at ? new Date(cliente.created_at).toLocaleDateString('es-AR') : '-'}</td>
                   <td>{ultima ? formatDateTime(ultima) : '-'}</td>
                   <td>{activas}</td>
                 </tr>
